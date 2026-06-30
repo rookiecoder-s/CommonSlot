@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CommonSlot — find when everyone can meet</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* ── Reset & Base ── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{
+  font-family:'Plus Jakarta Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  background:
+    radial-gradient(1100px 700px at 14% -8%, rgba(186,117,23,.16), transparent 60%),
+    radial-gradient(900px 650px at 108% 8%, rgba(29,158,117,.14), transparent 55%),
+    radial-gradient(800px 600px at 50% 115%, rgba(133,167,235,.16), transparent 55%),
+    #fbf8f2;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  position:relative;
+  overflow-x:hidden;
+}
+/* faint longitude/latitude grid + orbit rings, pure decoration */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  pointer-events:none;
+  z-index:0;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(26,26,26,.035) 0px, rgba(26,26,26,.035) 1px, transparent 1px, transparent 64px),
+    repeating-linear-gradient(90deg, rgba(26,26,26,.035) 0px, rgba(26,26,26,.035) 1px, transparent 1px, transparent 64px);
+  -webkit-mask-image:radial-gradient(900px 700px at 50% 0%, #000 0%, transparent 75%);
+  mask-image:radial-gradient(900px 700px at 50% 0%, #000 0%, transparent 75%);
+}
+body::after{
+  content:'';
+  position:fixed;
+  top:-220px;right:-220px;
+  width:520px;height:520px;
+  border-radius:50%;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255,255,255,.55), transparent 42%),
+    conic-gradient(from 200deg, #BA7517, #EF9F27, #5DCAA5, #57C4D4, #85B7EB, #BA7517);
+  opacity:.10;
+  filter:blur(2px);
+  animation:spin-slow 70s linear infinite;
+}
+@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+#app{position:relative;z-index:1}
+
+/* ── Layout ── */
+.wrap{
+  width:100%;
+  max-width:620px;
+  margin:0 auto;
+  padding:clamp(.75rem,4vw,1.5rem) clamp(.75rem,4vw,1rem) clamp(2rem,6vw,3rem);
+}
+.hero{text-align:center;margin-bottom:clamp(1.25rem,4vw,2rem);padding:clamp(1.25rem,4vw,2.25rem) 1rem clamp(.75rem,3vw,1.5rem);position:relative}
+.hero::before{
+  content:'';
+  display:block;
+  width:clamp(52px,12vw,68px);
+  height:clamp(52px,12vw,68px);
+  margin:0 auto .5rem;
+  background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20200%20200%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3CradialGradient%20id%3D%22ocean%22%20cx%3D%2238%25%22%20cy%3D%2232%25%22%20r%3D%2275%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23bfe8ea%22/%3E%20%3Cstop%20offset%3D%2235%25%22%20stop-color%3D%22%236cc6c9%22/%3E%20%3Cstop%20offset%3D%2270%25%22%20stop-color%3D%22%232f8f9b%22/%3E%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23155a6e%22/%3E%20%3C/radialGradient%3E%20%3CradialGradient%20id%3D%22shade%22%20cx%3D%2265%25%22%20cy%3D%2272%25%22%20r%3D%2265%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%230a2f42%22%20stop-opacity%3D%220%22/%3E%20%3Cstop%20offset%3D%2270%25%22%20stop-color%3D%22%230a2f42%22%20stop-opacity%3D%220%22/%3E%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%2306202e%22%20stop-opacity%3D%22.55%22/%3E%20%3C/radialGradient%3E%20%3CradialGradient%20id%3D%22gloss%22%20cx%3D%2232%25%22%20cy%3D%2224%25%22%20r%3D%2230%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22%20stop-opacity%3D%22.85%22/%3E%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23ffffff%22%20stop-opacity%3D%220%22/%3E%20%3C/radialGradient%3E%20%3ClinearGradient%20id%3D%22land%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23e8b25a%22/%3E%20%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23BA7517%22/%3E%20%3C/linearGradient%3E%20%3CclipPath%20id%3D%22sphereClip%22%3E%20%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2292%22/%3E%20%3C/clipPath%3E%20%3C/defs%3E%20%3Ccircle%20cx%3D%22100%22%20cy%3D%22103%22%20r%3D%2292%22%20fill%3D%22%230a2f42%22%20opacity%3D%22.18%22/%3E%20%3Cg%20clip-path%3D%22url%28%23sphereClip%29%22%3E%20%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2292%22%20fill%3D%22url%28%23ocean%29%22/%3E%20%3Cpath%20d%3D%22M48%2036c10-8%2022-4%2026%204%205%2010-3%2016-12%2018-9%203-22-2-24-10-2-7%201-9%2010-12z%22%20fill%3D%22url%28%23land%29%22%20opacity%3D%22.92%22/%3E%20%3Cpath%20d%3D%22M118%2030c14-3%2030%204%2034%2016%204%2011-6%2019-18%2017-9-2-12-10-18-14-7-5-9-15%202-19z%22%20fill%3D%22url%28%23land%29%22%20opacity%3D%22.88%22/%3E%20%3Cpath%20d%3D%22M40%2096c8-6%2020-5%2026%202%207%208%202%2020-9%2024-12%204-26-2-29-13-2-7%202-9%2012-13z%22%20fill%3D%22url%28%23land%29%22%20opacity%3D%22.85%22/%3E%20%3Cpath%20d%3D%22M120%2092c12-5%2028%200%2033%2011%205%2011-4%2022-18%2022-11%200-19-9-22-16-3-7%200-13%207-17z%22%20fill%3D%22url%28%23land%29%22%20opacity%3D%22.9%22/%3E%20%3Cpath%20d%3D%22M70%20140c9-4%2020%200%2023%209%203%208-4%2015-14%2015-9%200-17-6-17-13%200-5%202-8%208-11z%22%20fill%3D%22url%28%23land%29%22%20opacity%3D%22.8%22/%3E%20%3Cpath%20d%3D%22M150%20130c8-2%2017%202%2019%209%202%207-4%2013-13%2012-7%200-13-5-13-10%200-5%202-9%207-11z%22%20fill%3D%22url%28%23land%29%22%20opacity%3D%22.75%22/%3E%20%3Cg%20stroke%3D%22%23ffffff%22%20stroke-opacity%3D%22.28%22%20fill%3D%22none%22%20stroke-width%3D%221.4%22%3E%20%3Cellipse%20cx%3D%22100%22%20cy%3D%22100%22%20rx%3D%2292%22%20ry%3D%2292%22/%3E%20%3Cellipse%20cx%3D%22100%22%20cy%3D%22100%22%20rx%3D%2246%22%20ry%3D%2292%22/%3E%20%3Cellipse%20cx%3D%22100%22%20cy%3D%22100%22%20rx%3D%2278%22%20ry%3D%2292%22/%3E%20%3Cellipse%20cx%3D%22100%22%20cy%3D%22100%22%20rx%3D%2214%22%20ry%3D%2292%22/%3E%20%3Cline%20x1%3D%228%22%20y1%3D%22100%22%20x2%3D%22192%22%20y2%3D%22100%22/%3E%20%3Cellipse%20cx%3D%22100%22%20cy%3D%22100%22%20rx%3D%2292%22%20ry%3D%2246%22/%3E%20%3Cellipse%20cx%3D%22100%22%20cy%3D%22100%22%20rx%3D%2292%22%20ry%3D%2220%22/%3E%20%3C/g%3E%20%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2292%22%20fill%3D%22url%28%23shade%29%22/%3E%20%3C/g%3E%20%3Ccircle%20cx%3D%22100%22%20cy%3D%22100%22%20r%3D%2292%22%20fill%3D%22none%22%20stroke%3D%22%230a2f42%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%222%22/%3E%20%3Cellipse%20cx%3D%2276%22%20cy%3D%2268%22%20rx%3D%2234%22%20ry%3D%2224%22%20fill%3D%22url%28%23gloss%29%22/%3E%20%3C/svg%3E");
+  background-size:contain;
+  background-repeat:no-repeat;
+  filter:drop-shadow(0 10px 16px rgba(10,47,66,.35));
+  animation:float-globe 6s ease-in-out infinite;
+}
+@keyframes float-globe{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}}
+.wordmark{font-family:'Space Grotesk',system-ui,sans-serif;font-size:clamp(26px,6.5vw,36px);font-weight:700;letter-spacing:-1.2px;color:#17191c}
+.wordmark span{
+  background:linear-gradient(120deg,#BA7517,#EF9F27 45%,#1D9E75 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.tagline{font-size:clamp(12.5px,3vw,14.5px);color:#7a7670;margin-top:8px;line-height:1.55;font-weight:500}
+
+/* ── Cards ── */
+.card{
+  background:linear-gradient(180deg,#ffffff,#fffdf9);
+  border:1px solid #ece4d6;
+  border-radius:clamp(16px,3.5vw,22px);
+  padding:clamp(1rem,4vw,1.5rem);
+  margin-bottom:1rem;
+  box-shadow:0 1px 2px rgba(35,25,10,.04), 0 14px 32px -16px rgba(35,25,10,.14);
+}
+.pill-label{display:inline-flex;align-items:center;gap:5px;font-size:clamp(10px,2.5vw,11px);font-weight:700;background:linear-gradient(120deg,#FAEEDA,#fff3df);color:#633806;border-radius:20px;padding:4px 11px;letter-spacing:.5px;margin-bottom:1rem;text-transform:uppercase;border:1px solid #f0dcb0}
+.participants{display:flex;flex-direction:column;gap:10px;margin-bottom:1rem}
+
+/* ── Participant rows ── */
+.p-row{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
+.dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 3px rgba(0,0,0,.04), 0 2px 5px rgba(0,0,0,.18)}
+.p-row input{flex:1;min-width:0;font-size:clamp(13px,3.5vw,15px);padding:10px 13px;border-radius:13px;border:1.5px solid #ddd2bd;background:#faf6ed;color:#1a1a1a;outline:none;font-family:inherit;width:100%;transition:border-color .15s,background .15s,box-shadow .15s}
+.p-row input:focus{border-color:#BA7517;background:#fff;box-shadow:0 0 0 4px rgba(186,117,23,.12)}
+.p-row input::placeholder{color:#b8b2a4}
+.p-name{width:clamp(80px,22vw,110px);min-width:0;font-size:clamp(12px,3vw,14px);padding:10px 11px;border-radius:13px;border:1.5px solid #ddd2bd;background:#faf6ed;color:#1a1a1a;outline:none;font-family:inherit;flex-shrink:0;transition:border-color .15s,background .15s,box-shadow .15s}
+.p-name:focus{border-color:#BA7517;background:#fff;box-shadow:0 0 0 4px rgba(186,117,23,.12)}
+.p-name::placeholder{color:#b8b2a4;font-style:italic}
+.rm{width:32px;height:32px;min-width:32px;border-radius:50%;border:1.5px solid #ddd2bd;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#a39c8e;flex-shrink:0;font-size:16px;line-height:1;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.rm:hover{color:#fff;border-color:#E06B8B;background:#E06B8B;transform:rotate(90deg)}
+
+/* ── Add row / Duration ── */
+.add-row{display:flex;align-items:center;gap:8px;font-size:clamp(12px,3vw,13px);color:#8c8678;font-weight:600;background:transparent;border:1.5px dashed #ddd2bd;border-radius:13px;padding:9px 14px;cursor:pointer;width:100%;margin-bottom:1rem;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.add-row:hover{color:#BA7517;border-color:#BA7517;background:#fdf8ee}
+.dur-row{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;flex-wrap:wrap}
+.dur-label{font-size:clamp(12px,3vw,13px);color:#8c8678;white-space:nowrap;font-weight:500}
+.dur-select{font-size:clamp(12px,3vw,13px);padding:8px 13px;border-radius:11px;border:1.5px solid #ddd2bd;background:#faf6ed;color:#1a1a1a;font-family:inherit;outline:none;cursor:pointer;max-width:100%;font-weight:600}
+.dur-select:focus{border-color:#BA7517}
+
+/* ── Buttons ── */
+.go{
+  width:100%;padding:clamp(12px,3vw,14px);font-size:clamp(14px,3.5vw,15.5px);font-weight:700;
+  background:linear-gradient(135deg,#d6911f,#BA7517 55%,#9c6310);
+  color:#fff;border:none;border-radius:15px;cursor:pointer;font-family:inherit;margin-bottom:.75rem;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;letter-spacing:.2px;
+  box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 10px 22px -8px rgba(186,117,23,.55);
+  transition:transform .15s, box-shadow .15s, filter .15s;
+}
+.go:hover{filter:brightness(1.06);box-shadow:0 1px 0 rgba(255,255,255,.25) inset, 0 14px 26px -8px rgba(186,117,23,.6)}
+.go:active{transform:scale(.985)}
+.go:disabled{opacity:.6;cursor:not-allowed;transform:none;filter:none}
+.hint{font-size:clamp(11px,2.5vw,12px);color:#aaa49a;text-align:center;line-height:1.6}
+.hint code{background:#f1ece0;padding:1px 6px;border-radius:5px;font-size:clamp(10px,2.5vw,11px);color:#6b6557;font-family:'Space Grotesk',monospace}
+.count-badge{font-size:12px;color:#aaa49a;margin-left:auto;padding-right:2px;font-weight:600}
+
+/* ── Timezone picker ── */
+.slot-wrap{flex:1;min-width:0;position:relative;display:flex;align-items:center;gap:6px}
+.slot-wrap input{flex:1;min-width:0}
+.tz-btn{width:36px;height:36px;min-width:36px;border-radius:10px;border:1.5px solid #ddd2bd;background:linear-gradient(180deg,#fff,#faf6ed);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.tz-btn:hover{border-color:#BA7517;background:#fff;transform:translateY(-1px);box-shadow:0 4px 10px -4px rgba(186,117,23,.4)}
+.tz-dropdown{position:absolute;z-index:9999;top:calc(100% + 8px);right:0;width:min(300px,calc(100vw - 2rem));background:#fff;border:1.5px solid #ece4d6;border-radius:18px;box-shadow:0 20px 50px -12px rgba(35,25,10,.28);overflow:hidden}
+.tz-search-wrap{padding:11px 13px;border-bottom:1px solid #f1ece0;background:#fdfaf3}
+.tz-search{width:100%;font-size:14px;padding:8px 12px;border-radius:10px;border:1.5px solid #ddd2bd;outline:none;font-family:inherit;background:#fff;color:#1a1a1a}
+.tz-search:focus{border-color:#BA7517}
+.tz-search::placeholder{color:#b8b2a4}
+.tz-list{max-height:min(240px,40vh);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tz-group-label{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#bbb2a0;padding:9px 14px 5px;background:#fdfaf3;position:sticky;top:0}
+.tz-item{padding:10px 14px;font-size:clamp(12px,3vw,13px);cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f7f2e8;-webkit-tap-highlight-color:transparent;transition:background .12s}
+.tz-item:last-child{border-bottom:none}
+.tz-item:hover,.tz-item:active{background:#FAEEDA}
+.tz-item-left{display:flex;flex-direction:column;gap:1px}
+.tz-item-city{font-weight:600;color:#1a1a1a}
+.tz-item-country{font-size:11px;color:#aaa49a}
+.tz-item-right{text-align:right;flex-shrink:0;margin-left:8px}
+.tz-item-abbr{font-size:12px;font-weight:700;color:#BA7517}
+.tz-item-offset{font-size:11px;color:#bbb2a0;font-family:'Space Grotesk',monospace}
+.tz-empty{padding:14px 13px;font-size:13px;color:#aaa49a;text-align:center}
+
+/* ── Share panel ── */
+.share-panel{background:linear-gradient(180deg,#ffffff,#fffdf9);border:1px solid #ece4d6;border-radius:clamp(16px,3.5vw,22px);padding:clamp(1rem,4vw,1.25rem) clamp(1rem,4vw,1.5rem);margin-bottom:1rem;box-shadow:0 1px 2px rgba(35,25,10,.04), 0 14px 32px -16px rgba(35,25,10,.14)}
+.share-title{font-size:13.5px;font-weight:700;color:#1a1a1a;margin-bottom:.25rem;font-family:'Space Grotesk',sans-serif}
+.share-sub{font-size:12px;color:#8c8678;margin-bottom:.75rem;line-height:1.5}
+.share-link-row{display:flex;gap:8px;align-items:stretch}
+.share-link-box{flex:1;min-width:0;font-size:clamp(10px,2.5vw,12px);padding:9px 11px;border-radius:11px;border:1.5px solid #ddd2bd;background:#faf6ed;color:#73705f;font-family:'Space Grotesk',monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.share-copy{font-size:clamp(12px,3vw,13px);font-weight:700;padding:9px clamp(10px,3vw,16px);border-radius:11px;border:none;background:linear-gradient(135deg,#d6911f,#BA7517);color:#fff;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0;-webkit-tap-highlight-color:transparent;box-shadow:0 8px 16px -8px rgba(186,117,23,.55);transition:filter .15s}
+.share-copy:hover{filter:brightness(1.06)}
+.share-actions{display:flex;gap:8px;margin-top:8px}
+.share-native{font-size:clamp(12px,3vw,13px);font-weight:700;padding:9px clamp(10px,3vw,16px);border-radius:11px;border:1.5px solid #ddd2bd;background:#fff;color:#854F0B;cursor:pointer;white-space:nowrap;font-family:inherit;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.share-native:hover{border-color:#BA7517;background:#fdf8ee}
+.share-native:active{transform:scale(.985)}
+
+/* ── Status list ── */
+.status-list{display:flex;flex-direction:column;gap:6px;margin-top:.75rem}
+.status-row{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:12px;background:#faf7f0;min-width:0;border:1px solid #f1ece0}
+.status-name{flex:1;min-width:0;font-size:clamp(12px,3vw,13px);font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-slot{font-size:clamp(10px,2.5vw,12px);color:#8c8678;font-family:'Space Grotesk',monospace;flex-shrink:0;white-space:nowrap}
+.s-tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.s-wait{background:#f1ece0;color:#aaa49a}
+.s-done{background:#E1F5EE;color:#085041}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#1D9E75;margin-right:4px;animation:blink 1.8s ease-in-out infinite;box-shadow:0 0 0 3px rgba(29,158,117,.18)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Result ── */
+.result{margin-top:0}
+.res-card{background:linear-gradient(180deg,#ffffff,#fffdf9);border:1px solid #ece4d6;border-radius:clamp(16px,3.5vw,22px);padding:clamp(1rem,4vw,1.5rem);box-shadow:0 1px 2px rgba(35,25,10,.04), 0 18px 38px -18px rgba(35,25,10,.18)}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:clamp(11px,2.5vw,12px);font-weight:700;padding:5px 13px;border-radius:20px}
+.b-ok{background:#E1F5EE;color:#085041}
+.b-comp{background:#FAEEDA;color:#633806}
+.big-time{font-family:'Space Grotesk',sans-serif;font-size:clamp(23px,5.5vw,32px);font-weight:700;letter-spacing:-1.1px;margin:.65rem 0 .2rem;color:#15171a;word-break:break-word}
+.sub-time{font-size:clamp(11px,2.5vw,13px);color:#8c8678;margin-bottom:1.25rem}
+.divider{height:1px;background:linear-gradient(90deg,transparent,#ece4d6,transparent);margin:1.25rem 0}
+.sec-title{font-size:11px;font-weight:700;color:#aaa49a;text-transform:uppercase;letter-spacing:.7px;margin-bottom:.75rem}
+.no-overlap-notice{background:#FAEEDA;border-radius:12px;padding:11px 15px;margin:.5rem 0 1rem;font-size:clamp(12px,3vw,13px);color:#633806;line-height:1.7;border:1px solid #f0dcb0}
+.suggest-box{background:linear-gradient(160deg,#FAEEDA,#fff6e6);border:1.5px solid #EF9F27;border-radius:18px;padding:clamp(1rem,4vw,1.25rem) clamp(1rem,4vw,1.5rem);box-shadow:0 14px 30px -14px rgba(239,159,39,.4)}
+.suggest-eyebrow{font-size:11px;font-weight:700;color:#854F0B;text-transform:uppercase;letter-spacing:.7px;margin-bottom:.5rem}
+.suggest-time{font-family:'Space Grotesk',sans-serif;font-size:clamp(19px,5vw,27px);font-weight:700;letter-spacing:-.6px;color:#412402;margin-bottom:.25rem;word-break:break-word}
+.suggest-utc{font-size:clamp(11px,2.5vw,13px);color:#854F0B;margin-bottom:1rem}
+.suggest-list{display:flex;flex-direction:column;gap:6px}
+.suggest-row{display:flex;align-items:center;gap:8px;background:#fffaf0;border-radius:11px;padding:9px 11px;min-width:0;flex-wrap:wrap;border:1px solid #f5e4bd}
+.suggest-name{font-size:clamp(12px,3vw,13px);font-weight:700;color:#412402;min-width:60px}
+.suggest-tz{font-size:clamp(11px,2.5vw,12px);color:#854F0B;margin-right:2px}
+.suggest-local{font-size:clamp(11px,2.5vw,13px);color:#633806;margin-left:auto;white-space:nowrap}
+.pp-list{display:flex;flex-direction:column;gap:8px}
+.pp{display:flex;align-items:center;gap:8px;padding:11px 13px;border-radius:15px;background:#faf7f0;min-width:0;flex-wrap:wrap;border:1px solid #f1ece0}
+.pp-label{flex:1;min-width:0;font-size:clamp(12px,3vw,14px);font-weight:700;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pp-t{font-size:clamp(11px,2.5vw,13px);color:#73705f;white-space:nowrap;font-family:'Space Grotesk',monospace}
+.st{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.s-ok{background:#E1F5EE;color:#085041}
+.s-warn{background:#FAEEDA;color:#633806}
+.fair-track{height:7px;border-radius:4px;background:#ece7df;overflow:hidden;margin:.45rem 0 .3rem;box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+.fair-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#EF9F27,#5DCAA5)}
+.fair-meta{display:flex;justify-content:space-between;font-size:11px;color:#aaa49a;font-weight:500}
+.copy-btn{display:flex;align-items:center;gap:6px;font-size:clamp(12px,3vw,13px);color:#8c8678;font-weight:600;background:#fff;border:1.5px solid #ddd2bd;border-radius:11px;padding:8px 15px;cursor:pointer;margin-top:1rem;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:all .15s}
+.copy-btn:hover{color:#1a1a1a;border-color:#BA7517;background:#fdf8ee}
+.err-msg{font-size:clamp(12px,3vw,13px);color:#c0392b;line-height:1.8}
+
+/* ── Participant view ── */
+.invite-banner{background:linear-gradient(160deg,#FAEEDA,#fff6e6);border:1.5px solid #EFC97A;border-radius:clamp(16px,3.5vw,22px);padding:clamp(1rem,4vw,1.5rem);margin-bottom:1rem;box-shadow:0 14px 30px -16px rgba(239,159,39,.35)}
+.invite-from{font-size:12px;color:#BA7517;font-weight:700;margin-bottom:5px}
+.invite-greeting{font-family:'Space Grotesk',sans-serif;font-size:clamp(19px,5vw,23px);font-weight:700;color:#412402;margin-bottom:4px;letter-spacing:-.4px}
+.invite-msg{font-size:clamp(12px,3vw,13px);color:#854F0B}
+.field-label{display:block;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#aaa49a;margin-bottom:5px}
+.field-input{width:100%;font-size:clamp(13px,3.5vw,15px);padding:11px 14px;border-radius:13px;border:1.5px solid #ddd2bd;background:#faf6ed;color:#1a1a1a;font-family:'Space Grotesk',monospace;outline:none;transition:border-color .15s,box-shadow .15s;margin-bottom:1rem}
+.field-input:focus{border-color:#BA7517;background:#fff;box-shadow:0 0 0 4px rgba(186,117,23,.12)}
+.field-input::placeholder{color:#b8b2a4;font-family:'Plus Jakarta Sans',system-ui}
+.success-box{background:linear-gradient(160deg,#E1F5EE,#eafbf4);border:1.5px solid #8ED4B4;border-radius:clamp(16px,3.5vw,22px);padding:clamp(1rem,4vw,1.25rem) clamp(1rem,4vw,1.5rem);box-shadow:0 14px 30px -16px rgba(29,158,117,.3)}
+.success-title{font-family:'Space Grotesk',sans-serif;font-size:clamp(15px,3.5vw,17px);font-weight:700;color:#085041;margin-bottom:.3rem}
+.success-msg{font-size:clamp(12px,3vw,13px);color:#2D6B4A;line-height:1.6}
+.success-slot{font-family:'Space Grotesk',monospace;font-size:clamp(12px,3vw,14px);background:rgba(255,255,255,.65);border-radius:9px;padding:9px 13px;margin-top:.75rem;color:#085041;font-weight:600;word-break:break-all}
+.others-list{display:flex;flex-direction:column;gap:6px}
+.others-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:#faf7f0;min-width:0;border:1px solid #f1ece0}
+.others-name{flex:1;min-width:0;font-size:clamp(12px,3vw,13px);font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.others-tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;flex-shrink:0}
+.ot-you{background:#FAEEDA;color:#BA7517}
+.ot-done{background:#E1F5EE;color:#085041}
+.ot-wait{background:#f1ece0;color:#aaa49a}
+
+/* ── Join view ── */
+.join-banner{background:linear-gradient(135deg,#FAEEDA 0%,#fff8ee 100%);border:1.5px solid #EFC97A;border-radius:clamp(16px,3.5vw,22px);padding:clamp(1.25rem,4vw,1.75rem) clamp(1rem,4vw,1.5rem);margin-bottom:1rem;text-align:center;box-shadow:0 16px 34px -16px rgba(239,159,39,.35)}
+.join-icon{font-size:clamp(30px,7vw,38px);margin-bottom:.5rem;display:inline-block;animation:float-globe 5s ease-in-out infinite}
+.join-title{font-family:'Space Grotesk',sans-serif;font-size:clamp(19px,5vw,23px);font-weight:700;color:#412402;letter-spacing:-.4px;margin-bottom:.35rem}
+.join-sub{font-size:clamp(12px,3vw,13px);color:#854F0B;line-height:1.6}
+.join-who{margin-top:.75rem;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.join-who-pill{font-size:clamp(11px,2.5vw,12px);font-weight:600;background:#fff;border:1px solid #EFC97A;color:#633806;border-radius:20px;padding:4px 11px}
+.join-dur{font-size:12px;color:#aaa49a;margin-top:.6rem;font-weight:500}
+
+/* ── Session History ── */
+.hist-section{margin-bottom:1rem}
+.hist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.hist-title{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#aaa49a}
+.hist-clear{font-size:11px;color:#ccc4b4;background:transparent;border:none;cursor:pointer;font-family:inherit;padding:2px 6px;border-radius:6px}
+.hist-clear:hover{color:#999}
+.hist-list{display:flex;flex-direction:column;gap:6px}
+.hist-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:14px;background:#fff;border:1.5px solid #ece4d6;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.hist-item:hover{border-color:#BA7517;box-shadow:0 8px 18px -10px rgba(186,117,23,.35)}
+.hist-dot{width:8px;height:8px;border-radius:50%;background:#BA7517;flex-shrink:0;box-shadow:0 0 0 3px rgba(186,117,23,.15)}
+.hist-info{flex:1;min-width:0}
+.hist-name{font-size:clamp(12px,3vw,13px);font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-meta{font-size:11px;color:#aaa49a;margin-top:1px}
+.hist-arrow{font-size:14px;color:#ccc4b4;flex-shrink:0}
+.new-meeting-btn{width:100%;padding:clamp(10px,3vw,12px);font-size:clamp(13px,3.5vw,14px);font-weight:700;background:#fff;color:#BA7517;border:2px solid #BA7517;border-radius:15px;cursor:pointer;font-family:inherit;margin-bottom:.75rem;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:all .15s}
+.new-meeting-btn:hover{background:#BA7517;color:#fff;box-shadow:0 10px 22px -10px rgba(186,117,23,.5)}
+.new-meeting-btn:active{transform:scale(.99)}
+
+/* ── How to use ── */
+.how-card{background:#fdfaf3;border:1.5px dashed #ddd2bd;border-radius:clamp(16px,3.5vw,22px);padding:clamp(1rem,4vw,1.25rem) clamp(1rem,4vw,1.5rem);margin-bottom:1rem}
+.how-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;-webkit-tap-highlight-color:transparent;background:none;border:none;width:100%;padding:0;font-family:inherit}
+.how-toggle-label{font-size:clamp(12px,3vw,13px);font-weight:700;color:#854F0B;display:flex;align-items:center;gap:6px}
+.how-toggle-arrow{font-size:14px;color:#ccc4b4;transition:transform .2s}
+.how-toggle-arrow.open{transform:rotate(180deg)}
+.how-body{display:none;margin-top:.85rem;border-top:1px solid #ece4d6;padding-top:.85rem}
+.how-body.open{display:block}
+.how-step{display:flex;gap:10px;margin-bottom:.75rem;align-items:flex-start}
+.how-step:last-child{margin-bottom:0}
+.how-num{width:23px;height:23px;min-width:23px;border-radius:50%;background:linear-gradient(135deg,#d6911f,#BA7517);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;box-shadow:0 3px 8px -2px rgba(186,117,23,.5)}
+.how-text{font-size:clamp(12px,3vw,13px);color:#633806;line-height:1.6}
+.how-text strong{color:#412402}
+
+/* ── Narrow phones (≤380px) ── */
+@media(max-width:380px){
+  .wrap{padding:.65rem .65rem 2.5rem}
+  .card{padding:.85rem}
+  .p-row{flex-wrap:wrap}
+  .p-name{width:100%}
+  .slot-wrap{width:100%}
+  .rm{margin-left:auto}
+  .share-link-row{flex-direction:column}
+  .share-copy{width:100%;text-align:center;padding:10px}
+  .suggest-row{flex-wrap:wrap}
+  .suggest-local{margin-left:0;width:100%}
+  .pp{flex-wrap:wrap}
+  .pp-t{width:100%}
+}
+
+/* ── Standard mobile (381–540px) ── */
+@media(min-width:381px) and (max-width:540px){
+  .p-row{flex-wrap:wrap;gap:6px}
+  .p-name{width:100%;flex-shrink:0}
+  .slot-wrap{flex:1;min-width:0}
+  .rm{flex-shrink:0}
+}
+
+/* ── Tablet portrait (541–768px) ── */
+@media(min-width:541px) and (max-width:768px){
+  .wrap{padding:1.25rem 1.5rem 3rem}
+  .p-name{width:clamp(90px,20vw,110px)}
+  .tz-dropdown{width:280px}
+}
+
+/* ── Tablet landscape / small laptop (769–1024px) ── */
+@media(min-width:769px) and (max-width:1024px){
+  .wrap{padding:1.5rem 2rem 3rem}
+}
+
+/* ── Large desktop (1025px+) ── */
+@media(min-width:1025px){
+  .wrap{padding:2rem 1rem 4rem}
+}
+
+/* ── Touch device tap targets ── */
+@media(hover:none) and (pointer:coarse){
+  .go,.share-copy,.add-row,.rm,.tz-btn,.tz-item{min-height:44px}
+  .tz-item{padding:12px 13px}
+  .go{padding:15px}
+  input,select{font-size:16px!important} /* prevents iOS zoom */
+}
+
+/* ── Inline emoji-replacement icons ── */
+.icon{display:inline-block;width:1.15em;height:1.15em;background-size:contain;background-repeat:no-repeat;background-position:center;vertical-align:-0.22em;flex-shrink:0}
+.icon-lg{width:1.5em;height:1.5em}
+.icon-globe{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3CradialGradient%20id%3D%22g1%22%20cx%3D%2236%25%22%20cy%3D%2230%25%22%20r%3D%2275%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23bfe8ea%22/%3E%3Cstop%20offset%3D%2240%25%22%20stop-color%3D%22%236cc6c9%22/%3E%3Cstop%20offset%3D%2275%25%22%20stop-color%3D%22%232f8f9b%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23155a6e%22/%3E%20%3C/radialGradient%3E%20%3CradialGradient%20id%3D%22g2%22%20cx%3D%2230%25%22%20cy%3D%2222%25%22%20r%3D%2228%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%22.8%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23fff%22%20stop-opacity%3D%220%22/%3E%20%3C/radialGradient%3E%20%3CclipPath%20id%3D%22c1%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2228%22/%3E%3C/clipPath%3E%20%3C/defs%3E%20%3Cg%20clip-path%3D%22url%28%23c1%29%22%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2228%22%20fill%3D%22url%28%23g1%29%22/%3E%20%3Cpath%20d%3D%22M16%2018c4-3%209-1%2010%202%202%204-1%206-5%207-4%201-9-1-10-4-1-3%201-4%205-5z%22%20fill%3D%22%23e8b25a%22%20opacity%3D%22.9%22/%3E%20%3Cpath%20d%3D%22M36%2014c6-1%2012%202%2013%206%201%204-3%207-8%206-4-1-5-4-8-6-2-2-2-5%203-6z%22%20fill%3D%22%23BA7517%22%20opacity%3D%22.85%22/%3E%20%3Cpath%20d%3D%22M14%2036c4-2%209-1%2011%202%203%204%200%208-4%209-5%202-10-1-11-5-1-3%200-5%204-6z%22%20fill%3D%22%23e8b25a%22%20opacity%3D%22.8%22/%3E%20%3Cpath%20d%3D%22M38%2035c5-2%2011%200%2013%204%202%204-2%208-7%208-4%200-7-3-8-6-1-3%200-5%202-6z%22%20fill%3D%22%23BA7517%22%20opacity%3D%22.85%22/%3E%20%3Cg%20stroke%3D%22%23fff%22%20stroke-opacity%3D%22.3%22%20fill%3D%22none%22%20stroke-width%3D%22.9%22%3E%20%3Cellipse%20cx%3D%2232%22%20cy%3D%2232%22%20rx%3D%2214%22%20ry%3D%2228%22/%3E%20%3Cline%20x1%3D%224%22%20y1%3D%2232%22%20x2%3D%2260%22%20y2%3D%2232%22/%3E%20%3Cellipse%20cx%3D%2232%22%20cy%3D%2232%22%20rx%3D%2228%22%20ry%3D%2214%22/%3E%20%3C/g%3E%20%3C/g%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2228%22%20fill%3D%22none%22%20stroke%3D%22%230a2f42%22%20stroke-opacity%3D%22.35%22%20stroke-width%3D%221.4%22/%3E%20%3Cellipse%20cx%3D%2224%22%20cy%3D%2222%22%20rx%3D%2211%22%20ry%3D%228%22%20fill%3D%22url%28%23g2%29%22/%3E%20%3C/svg%3E")}
+.icon-calendar{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22cb%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23f1ece0%22/%3E%20%3C/linearGradient%3E%20%3ClinearGradient%20id%3D%22ct%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23E06B8B%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23c14a6c%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Crect%20x%3D%228%22%20y%3D%2214%22%20width%3D%2248%22%20height%3D%2242%22%20rx%3D%227%22%20fill%3D%22url%28%23cb%29%22%20stroke%3D%22%23d6cfc3%22%20stroke-width%3D%221.5%22/%3E%20%3Cpath%20d%3D%22M8%2021c0-4%203-7%207-7h34c4%200%207%203%207%207v6H8v-6z%22%20fill%3D%22url%28%23ct%29%22/%3E%20%3Crect%20x%3D%2216%22%20y%3D%226%22%20width%3D%225%22%20height%3D%2212%22%20rx%3D%222.5%22%20fill%3D%22%23854F0B%22/%3E%20%3Crect%20x%3D%2243%22%20y%3D%226%22%20width%3D%225%22%20height%3D%2212%22%20rx%3D%222.5%22%20fill%3D%22%23854F0B%22/%3E%20%3Cg%20fill%3D%22%23d8cdb8%22%3E%20%3Crect%20x%3D%2214%22%20y%3D%2232%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22/%3E%3Crect%20x%3D%2228%22%20y%3D%2232%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22/%3E%3Crect%20x%3D%2242%22%20y%3D%2232%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22/%3E%20%3Crect%20x%3D%2214%22%20y%3D%2243%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22/%3E%3Crect%20x%3D%2228%22%20y%3D%2243%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22%20fill%3D%22%23EF9F27%22/%3E%3Crect%20x%3D%2242%22%20y%3D%2243%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22/%3E%20%3C/g%3E%20%3C/svg%3E")}
+.icon-clipboard{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22pb%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23f3eee2%22/%3E%20%3C/linearGradient%3E%20%3ClinearGradient%20id%3D%22cm%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23cbc2ab%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23a59a7c%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Crect%20x%3D%2210%22%20y%3D%2210%22%20width%3D%2244%22%20height%3D%2250%22%20rx%3D%226%22%20fill%3D%22url%28%23pb%29%22%20stroke%3D%22%23d6cfc3%22%20stroke-width%3D%221.5%22/%3E%20%3Crect%20x%3D%2222%22%20y%3D%224%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%224%22%20fill%3D%22url%28%23cm%29%22/%3E%20%3Crect%20x%3D%2226%22%20y%3D%227%22%20width%3D%2212%22%20height%3D%225%22%20rx%3D%222.5%22%20fill%3D%22%237d735a%22/%3E%20%3Cg%20stroke%3D%22%23BA7517%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%3E%20%3Cline%20x1%3D%2218%22%20y1%3D%2228%22%20x2%3D%2246%22%20y2%3D%2228%22/%3E%3Cline%20x1%3D%2218%22%20y1%3D%2237%22%20x2%3D%2246%22%20y2%3D%2237%22/%3E%3Cline%20x1%3D%2218%22%20y1%3D%2246%22%20x2%3D%2236%22%20y2%3D%2246%22/%3E%20%3C/g%3E%20%3C/svg%3E")}
+.icon-bulb{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3CradialGradient%20id%3D%22bg%22%20cx%3D%2240%25%22%20cy%3D%2230%25%22%20r%3D%2270%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23fff6d6%22/%3E%3Cstop%20offset%3D%2245%25%22%20stop-color%3D%22%23ffd75e%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23EF9F27%22/%3E%20%3C/radialGradient%3E%20%3C/defs%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2226%22%20r%3D%2218%22%20fill%3D%22url%28%23bg%29%22/%3E%20%3Crect%20x%3D%2225%22%20y%3D%2240%22%20width%3D%2214%22%20height%3D%229%22%20rx%3D%222%22%20fill%3D%22%23cbc2ab%22/%3E%20%3Crect%20x%3D%2226%22%20y%3D%2250%22%20width%3D%2212%22%20height%3D%225%22%20rx%3D%222%22%20fill%3D%22%23a59a7c%22/%3E%20%3Cpath%20d%3D%22M27%2030c0-4%202-7%205-8%22%20stroke%3D%22%23fff%22%20stroke-opacity%3D%22.7%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22%20fill%3D%22none%22/%3E%20%3Cg%20stroke%3D%22%23EF9F27%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22%3E%20%3Cline%20x1%3D%2232%22%20y1%3D%222%22%20x2%3D%2232%22%20y2%3D%227%22/%3E%3Cline%20x1%3D%2210%22%20y1%3D%2226%22%20x2%3D%2215%22%20y2%3D%2226%22/%3E%3Cline%20x1%3D%2249%22%20y1%3D%2226%22%20x2%3D%2254%22%20y2%3D%2226%22/%3E%20%3Cline%20x1%3D%2216%22%20y1%3D%2210%22%20x2%3D%2219.5%22%20y2%3D%2213.5%22/%3E%3Cline%20x1%3D%2248%22%20y1%3D%2210%22%20x2%3D%2244.5%22%20y2%3D%2213.5%22/%3E%20%3C/g%3E%20%3C/svg%3E")}
+.icon-link{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22lg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%2385B7EB%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%233f7fc4%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Cg%20fill%3D%22none%22%20stroke%3D%22url%28%23lg%29%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%3E%20%3Cpath%20d%3D%22M26%2038%20L38%2026%22/%3E%20%3Cpath%20d%3D%22M16%2048c-6-6-6-15%200-21l6-6c6-6%2015-6%2021%200%22/%3E%20%3Cpath%20d%3D%22M48%2016c6%206%206%2015%200%2021l-6%206c-6%206-15%206-21%200%22%20transform%3D%22translate%280%2C0%29%22/%3E%20%3C/g%3E%20%3Cg%20fill%3D%22none%22%20stroke%3D%22url%28%23lg%29%22%20stroke-width%3D%228%22%20stroke-linecap%3D%22round%22%3E%20%3Cpath%20d%3D%22M14%2050c-6-6-6-16%200-22l7-7c6-6%2016-6%2022%200%22/%3E%20%3Cpath%20d%3D%22M50%2014c6%206%206%2016%200%2022l-7%207c-6%206-16%206-22%200%22/%3E%20%3C/g%3E%20%3C/svg%3E")}
+.icon-warning{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22wg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffe27a%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23EF9F27%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Cpath%20d%3D%22M32%206%20L60%2054%20L4%2054%20Z%22%20fill%3D%22url%28%23wg%29%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22/%3E%20%3Crect%20x%3D%2229%22%20y%3D%2224%22%20width%3D%226%22%20height%3D%2216%22%20rx%3D%223%22%20fill%3D%22%23633806%22/%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2246%22%20r%3D%223.4%22%20fill%3D%22%23633806%22/%3E%20%3C/svg%3E")}
+.icon-check{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3CradialGradient%20id%3D%22chk%22%20cx%3D%2235%25%22%20cy%3D%2230%25%22%20r%3D%2275%25%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%237fe0bb%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%231D9E75%22/%3E%20%3C/radialGradient%3E%20%3C/defs%3E%20%3Ccircle%20cx%3D%2232%22%20cy%3D%2232%22%20r%3D%2226%22%20fill%3D%22url%28%23chk%29%22/%3E%20%3Cpath%20d%3D%22M19%2033l9%209%2017-18%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%20%3C/svg%3E")}
+.icon-send{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22sg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23f3eee2%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Cpath%20d%3D%22M6%2030%20L56%208%20L36%2058%20L28%2038%20L6%2030%20Z%22%20fill%3D%22url%28%23sg%29%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%222.2%22%20stroke-linejoin%3D%22round%22/%3E%20%3Cpath%20d%3D%22M28%2038%20L48%2016%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%222.2%22%20stroke-linecap%3D%22round%22/%3E%20%3C/svg%3E")}
+.icon-wave{background-image:url("data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2064%2064%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%20%3Cdefs%3E%20%3ClinearGradient%20id%3D%22hg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%20%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffd9a8%22/%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23e8b25a%22/%3E%20%3C/linearGradient%3E%20%3C/defs%3E%20%3Cpath%20d%3D%22M22%2058c-6-2-10-8-10-16V24c0-2.5%202-4.5%204.5-4.5S21%2021.5%2021%2024v10%22%20fill%3D%22url%28%23hg%29%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%221.2%22/%3E%20%3Cpath%20d%3D%22M21%2030V12c0-2.5%202-4.5%204.5-4.5S30%209.5%2030%2012v18%22%20fill%3D%22url%28%23hg%29%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%221.2%22/%3E%20%3Cpath%20d%3D%22M30%2028V8c0-2.5%202-4.5%204.5-4.5S39%205.5%2039%208v22%22%20fill%3D%22url%28%23hg%29%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%221.2%22/%3E%20%3Cpath%20d%3D%22M39%2030V14c0-2.5%202-4.5%204.5-4.5S48%2011.5%2048%2014v22c0%2012-8%2022-19%2022-7%200-12-3-15-8%22%20fill%3D%22url%28%23hg%29%22%20stroke%3D%22%23BA7517%22%20stroke-width%3D%221.2%22/%3E%20%3C/svg%3E")}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════╗
+// ║  PASTE YOUR SUPABASE CREDENTIALS BELOW          ║
+// ╚══════════════════════════════════════════════════╝
+const SUPABASE_URL  = 'https://uhzptzlqnelyejqnvdwp.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoenB0emxxbmVseWVqcW52ZHdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2MDEyNzMsImV4cCI6MjA5NTE3NzI3M30.tFUyGbDGz_nfQYjJ2XVJa_lw1qcYaLRRbGaMo4LFhvA';
+
+// Fix: DataCloneError — Supabase builds Headers objects that can't pass
+// through postMessage (structured-clone). Flatten them to plain objects.
+function headersToPlain(h) {
+  if (!h) return {};
+  if (h instanceof Headers) {
+    const out = {};
+    h.forEach(function(v, k) { out[k] = v; });
+    return out;
+  }
+  return Object.assign({}, h);
+}
+function safeFetch(input, init) {
+  var plainInit = init ? Object.assign({}, init, { headers: headersToPlain(init.headers) }) : undefined;
+  if (input instanceof Request) {
+    var req = input;
+    var plainHeaders = headersToPlain(req.headers);
+    var body = plainInit && plainInit.body !== undefined ? plainInit.body :
+               (req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined);
+    input = new Request(req.url, {
+      method: req.method,
+      headers: plainHeaders,
+      body: body,
+      mode: req.mode,
+      credentials: req.credentials,
+      cache: req.cache,
+      redirect: req.redirect,
+    });
+    plainInit = undefined;
+  }
+  return fetch(input, plainInit);
+}
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  global: { fetch: safeFetch }
+});
+
+// ── Constants ──────────────────────────────────────
+const PALETTE=['#EF9F27','#5DCAA5','#F0997B','#85B7EB','#AFA9EC','#E06B8B','#57C4D4','#A8D44E','#F0C14B','#8B7FD4','#5BB8A0','#E8824A','#6BAED6','#C49DD4','#72B86E'];
+const TZ={UTC:0,GMT:0,IST:330,EST:-300,EDT:-240,PST:-480,PDT:-420,CST:-360,CDT:-300,MST:-420,MDT:-360,AST:-240,WAT:60,CAT:120,EAT:180,CET:60,CEST:120,WET:0,WEST:60,EET:120,EEST:180,MSK:180,TRT:180,GST:240,PKT:300,BST:60,SGT:480,HKT:480,JST:540,KST:540,AEST:600,AEDT:660,ACST:570,ACDT:630,NZST:720,NZDT:780,ICT:420,WIB:420,WIT:540,WITA:480,VET:-270,CLT:-240,CLST:-180,BRT:-180,BRST:-120,ART:-180,PET:-300,COT:-300,ECT:-300,BOT:-240,GYT:-240,SRT:-180,UYT:-180,PYT:-240,CVT:-60,AZOT:-60,SAST:120,IRST:210,AFT:270,NPT:345,MMT:390,CCT:390,AWST:480,PGT:600,SBT:660,NFT:690,FJST:780,TOT:780};
+const MAX=15;
+let rows=[],rowCounter=0,realtimeChannel=null;
+
+// ── Timezone city list ─────────────────────────────
+const TZ_CITIES=[
+  {city:'Abidjan',country:'Côte d\'Ivoire',iana:'Africa/Abidjan'},
+  {city:'Abu Dhabi',country:'UAE',iana:'Asia/Dubai'},
+  {city:'Accra',country:'Ghana',iana:'Africa/Accra'},
+  {city:'Addis Ababa',country:'Ethiopia',iana:'Africa/Addis_Ababa'},
+  {city:'Adelaide',country:'Australia',iana:'Australia/Adelaide'},
+  {city:'Almaty',country:'Kazakhstan',iana:'Asia/Almaty'},
+  {city:'Amsterdam',country:'Netherlands',iana:'Europe/Amsterdam'},
+  {city:'Anchorage',country:'USA',iana:'America/Anchorage'},
+  {city:'Ankara',country:'Turkey',iana:'Europe/Istanbul'},
+  {city:'Athens',country:'Greece',iana:'Europe/Athens'},
+  {city:'Auckland',country:'New Zealand',iana:'Pacific/Auckland'},
+  {city:'Baghdad',country:'Iraq',iana:'Asia/Baghdad'},
+  {city:'Baku',country:'Azerbaijan',iana:'Asia/Baku'},
+  {city:'Bangkok',country:'Thailand',iana:'Asia/Bangkok'},
+  {city:'Barcelona',country:'Spain',iana:'Europe/Madrid'},
+  {city:'Beijing',country:'China',iana:'Asia/Shanghai'},
+  {city:'Beirut',country:'Lebanon',iana:'Asia/Beirut'},
+  {city:'Belgrade',country:'Serbia',iana:'Europe/Belgrade'},
+  {city:'Berlin',country:'Germany',iana:'Europe/Berlin'},
+  {city:'Bogotá',country:'Colombia',iana:'America/Bogota'},
+  {city:'Brussels',country:'Belgium',iana:'Europe/Brussels'},
+  {city:'Bucharest',country:'Romania',iana:'Europe/Bucharest'},
+  {city:'Budapest',country:'Hungary',iana:'Europe/Budapest'},
+  {city:'Buenos Aires',country:'Argentina',iana:'America/Argentina/Buenos_Aires'},
+  {city:'Cairo',country:'Egypt',iana:'Africa/Cairo'},
+  {city:'Calgary',country:'Canada',iana:'America/Edmonton'},
+  {city:'Casablanca',country:'Morocco',iana:'Africa/Casablanca'},
+  {city:'Chennai',country:'India',iana:'Asia/Kolkata'},
+  {city:'Chicago',country:'USA',iana:'America/Chicago'},
+  {city:'Colombo',country:'Sri Lanka',iana:'Asia/Colombo'},
+  {city:'Copenhagen',country:'Denmark',iana:'Europe/Copenhagen'},
+  {city:'Dakar',country:'Senegal',iana:'Africa/Dakar'},
+  {city:'Dallas',country:'USA',iana:'America/Chicago'},
+  {city:'Dar es Salaam',country:'Tanzania',iana:'Africa/Dar_es_Salaam'},
+  {city:'Delhi',country:'India',iana:'Asia/Kolkata'},
+  {city:'Denver',country:'USA',iana:'America/Denver'},
+  {city:'Dhaka',country:'Bangladesh',iana:'Asia/Dhaka'},
+  {city:'Dubai',country:'UAE',iana:'Asia/Dubai'},
+  {city:'Dublin',country:'Ireland',iana:'Europe/Dublin'},
+  {city:'Frankfurt',country:'Germany',iana:'Europe/Berlin'},
+  {city:'Guatemala City',country:'Guatemala',iana:'America/Guatemala'},
+  {city:'Hanoi',country:'Vietnam',iana:'Asia/Ho_Chi_Minh'},
+  {city:'Havana',country:'Cuba',iana:'America/Havana'},
+  {city:'Helsinki',country:'Finland',iana:'Europe/Helsinki'},
+  {city:'Ho Chi Minh',country:'Vietnam',iana:'Asia/Ho_Chi_Minh'},
+  {city:'Hong Kong',country:'China',iana:'Asia/Hong_Kong'},
+  {city:'Honolulu',country:'USA',iana:'Pacific/Honolulu'},
+  {city:'Houston',country:'USA',iana:'America/Chicago'},
+  {city:'Hyderabad',country:'India',iana:'Asia/Kolkata'},
+  {city:'Istanbul',country:'Turkey',iana:'Europe/Istanbul'},
+  {city:'Jakarta',country:'Indonesia',iana:'Asia/Jakarta'},
+  {city:'Johannesburg',country:'South Africa',iana:'Africa/Johannesburg'},
+  {city:'Kabul',country:'Afghanistan',iana:'Asia/Kabul'},
+  {city:'Karachi',country:'Pakistan',iana:'Asia/Karachi'},
+  {city:'Kathmandu',country:'Nepal',iana:'Asia/Kathmandu'},
+  {city:'Kiev',country:'Ukraine',iana:'Europe/Kiev'},
+  {city:'Kinshasa',country:'DR Congo',iana:'Africa/Kinshasa'},
+  {city:'Kolkata',country:'India',iana:'Asia/Kolkata'},
+  {city:'Kuala Lumpur',country:'Malaysia',iana:'Asia/Kuala_Lumpur'},
+  {city:'Kuwait City',country:'Kuwait',iana:'Asia/Kuwait'},
+  {city:'Lagos',country:'Nigeria',iana:'Africa/Lagos'},
+  {city:'Lahore',country:'Pakistan',iana:'Asia/Karachi'},
+  {city:'Lima',country:'Peru',iana:'America/Lima'},
+  {city:'Lisbon',country:'Portugal',iana:'Europe/Lisbon'},
+  {city:'London',country:'UK',iana:'Europe/London'},
+  {city:'Los Angeles',country:'USA',iana:'America/Los_Angeles'},
+  {city:'Luanda',country:'Angola',iana:'Africa/Luanda'},
+  {city:'Madrid',country:'Spain',iana:'Europe/Madrid'},
+  {city:'Manila',country:'Philippines',iana:'Asia/Manila'},
+  {city:'Melbourne',country:'Australia',iana:'Australia/Melbourne'},
+  {city:'Mexico City',country:'Mexico',iana:'America/Mexico_City'},
+  {city:'Miami',country:'USA',iana:'America/New_York'},
+  {city:'Milan',country:'Italy',iana:'Europe/Rome'},
+  {city:'Minneapolis',country:'USA',iana:'America/Chicago'},
+  {city:'Minsk',country:'Belarus',iana:'Europe/Minsk'},
+  {city:'Montreal',country:'Canada',iana:'America/Toronto'},
+  {city:'Moscow',country:'Russia',iana:'Europe/Moscow'},
+  {city:'Mumbai',country:'India',iana:'Asia/Kolkata'},
+  {city:'Nairobi',country:'Kenya',iana:'Africa/Nairobi'},
+  {city:'New York',country:'USA',iana:'America/New_York'},
+  {city:'Oslo',country:'Norway',iana:'Europe/Oslo'},
+  {city:'Osaka',country:'Japan',iana:'Asia/Tokyo'},
+  {city:'Ottawa',country:'Canada',iana:'America/Toronto'},
+  {city:'Paris',country:'France',iana:'Europe/Paris'},
+  {city:'Perth',country:'Australia',iana:'Australia/Perth'},
+  {city:'Phoenix',country:'USA',iana:'America/Phoenix'},
+  {city:'Prague',country:'Czech Republic',iana:'Europe/Prague'},
+  {city:'Pune',country:'India',iana:'Asia/Kolkata'},
+  {city:'Riyadh',country:'Saudi Arabia',iana:'Asia/Riyadh'},
+  {city:'Rome',country:'Italy',iana:'Europe/Rome'},
+  {city:'San Francisco',country:'USA',iana:'America/Los_Angeles'},
+  {city:'Santiago',country:'Chile',iana:'America/Santiago'},
+  {city:'São Paulo',country:'Brazil',iana:'America/Sao_Paulo'},
+  {city:'Seattle',country:'USA',iana:'America/Los_Angeles'},
+  {city:'Seoul',country:'South Korea',iana:'Asia/Seoul'},
+  {city:'Shanghai',country:'China',iana:'Asia/Shanghai'},
+  {city:'Singapore',country:'Singapore',iana:'Asia/Singapore'},
+  {city:'Sofia',country:'Bulgaria',iana:'Europe/Sofia'},
+  {city:'Stockholm',country:'Sweden',iana:'Europe/Stockholm'},
+  {city:'Sydney',country:'Australia',iana:'Australia/Sydney'},
+  {city:'Taipei',country:'Taiwan',iana:'Asia/Taipei'},
+  {city:'Tashkent',country:'Uzbekistan',iana:'Asia/Tashkent'},
+  {city:'Tehran',country:'Iran',iana:'Asia/Tehran'},
+  {city:'Tel Aviv',country:'Israel',iana:'Asia/Jerusalem'},
+  {city:'Tokyo',country:'Japan',iana:'Asia/Tokyo'},
+  {city:'Toronto',country:'Canada',iana:'America/Toronto'},
+  {city:'UTC',country:'Universal',iana:'UTC'},
+  {city:'Vancouver',country:'Canada',iana:'America/Vancouver'},
+  {city:'Vienna',country:'Austria',iana:'Europe/Vienna'},
+  {city:'Warsaw',country:'Poland',iana:'Europe/Warsaw'},
+  {city:'Washington DC',country:'USA',iana:'America/New_York'},
+  {city:'Yangon',country:'Myanmar',iana:'Asia/Rangoon'},
+  {city:'Zurich',country:'Switzerland',iana:'Europe/Zurich'},
+];
+
+// ── Intl helpers ───────────────────────────────────
+function ianaOffset(iana){
+  try{
+    const fmt=new Intl.DateTimeFormat('en',{timeZone:iana,timeZoneName:'shortOffset'});
+    const str=fmt.formatToParts(new Date()).find(p=>p.type==='timeZoneName')?.value||'UTC+0';
+    const m=str.match(/UTC([+-])(\d{1,2})(?::(\d{2}))?/);
+    if(!m)return 0;
+    return(m[1]==='+'?1:-1)*(parseInt(m[2])*60+(parseInt(m[3]||'0')));
+  }catch{return 0;}
+}
+function ianaAbbr(iana){
+  try{
+    const fmt=new Intl.DateTimeFormat('en',{timeZone:iana,timeZoneName:'short'});
+    return fmt.formatToParts(new Date()).find(p=>p.type==='timeZoneName')?.value||iana;
+  }catch{return iana;}
+}
+function fmtOffset(mins){
+  const s=mins>=0?'+':'-',a=Math.abs(mins),h=Math.floor(a/60),m=a%60;
+  return 'UTC'+s+h+(m?':'+String(m).padStart(2,'0'):'');
+}
+
+// ── TZ Dropdown ────────────────────────────────────
+let activeDrop=null;
+document.addEventListener('click',()=>{if(activeDrop){activeDrop.remove();activeDrop=null;}});
+
+function openTzDropdown(btn,slotInput){
+  if(activeDrop){activeDrop.remove();activeDrop=null;return;}
+  const drop=document.createElement('div');
+  drop.className='tz-dropdown';
+  drop.addEventListener('click',e=>e.stopPropagation());
+  const searchWrap=document.createElement('div');
+  searchWrap.className='tz-search-wrap';
+  const search=document.createElement('input');
+  search.className='tz-search';search.type='text';search.placeholder='Search city or country…';
+  searchWrap.appendChild(search);
+  const list=document.createElement('div');list.className='tz-list';
+  function render(q){
+    list.innerHTML='';
+    const q2=q.toLowerCase().trim();
+    const filtered=q2?TZ_CITIES.filter(c=>c.city.toLowerCase().includes(q2)||c.country.toLowerCase().includes(q2)):TZ_CITIES;
+    if(!filtered.length){list.innerHTML='<div class="tz-empty">No results for "'+q+'"</div>';return;}
+    if(!q2){
+      let last='';
+      filtered.forEach(c=>{
+        const l=c.city[0].toUpperCase();
+        if(l!==last){last=l;const g=document.createElement('div');g.className='tz-group-label';g.textContent=l;list.appendChild(g);}
+        list.appendChild(makeItem(c,slotInput,drop));
+      });
+    }else filtered.forEach(c=>list.appendChild(makeItem(c,slotInput,drop)));
+  }
+  function makeItem(c,slotInput,drop){
+    const abbr=ianaAbbr(c.iana),offset=ianaOffset(c.iana);
+    const item=document.createElement('div');item.className='tz-item';
+    item.innerHTML='<div class="tz-item-left"><span class="tz-item-city">'+c.city+'</span><span class="tz-item-country">'+c.country+'</span></div><div class="tz-item-right"><div class="tz-item-abbr">'+abbr+'</div><div class="tz-item-offset">'+fmtOffset(offset)+'</div></div>';
+    item.addEventListener('click',()=>{
+      const cur=slotInput.value.trim();
+      const stripped=cur.replace(/\s+[A-Za-z0-9+:\-]{2,12}$/,'').trim();
+      // If this city's short name isn't one of our universal abbreviations, use a
+      // self-contained "GMT±H:MM" label instead — that way anyone reading it later
+      // (e.g. the organiser, in a different browser) can resolve it without needing
+      // the same picker selection.
+      const known=TZ[abbr.toUpperCase()]!==undefined&&TZ[abbr.toUpperCase()]===offset;
+      const label=known?abbr:fmtOffset(offset).replace('UTC','GMT');
+      slotInput.value=stripped?(stripped+' '+label):label;
+      slotInput.placeholder='e.g. 2pm-8pm '+label;
+      TZ[label.toUpperCase()]=offset;
+      drop.remove();activeDrop=null;slotInput.focus();
+    });
+    return item;
+  }
+  search.addEventListener('input',()=>render(search.value));
+  render('');
+  drop.appendChild(searchWrap);drop.appendChild(list);
+  btn.appendChild(drop);activeDrop=drop;
+  setTimeout(()=>search.focus(),30);
+}
+
+// ── Core utils ─────────────────────────────────────
+function randId(n=8){return Math.random().toString(36).slice(2,2+n);}
+function displayName(name,slot,i){
+  if(name&&name.trim())return name.trim();
+  if(slot&&slot.trim()){const tz=slot.trim().split(/\s+/).pop().toUpperCase();if(TZ[tz]!==undefined)return tz;}
+  return 'Person '+(i+1);
+}
+function parseTime(s){
+  s=s.trim().toLowerCase();let h,m=0,match;
+  if((match=s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/))){
+    h=+match[1];m=match[2]?+match[2]:0;
+    if(match[3]==='pm'&&h!==12)h+=12;
+    if(match[3]==='am'&&h===12)h=0;
+  }else if((match=s.match(/^(\d{1,2}):(\d{2})$/))){h=+match[1];m=+match[2];}
+  else return null;
+  return h*60+m;
+}
+function parseInput(raw){
+  raw=raw.trim();
+  const parts=raw.split(/\s+/);if(parts.length<2)return null;
+  const tzStr=parts[parts.length-1].toUpperCase();
+  let offset=TZ[tzStr];
+  if(offset===undefined){
+    // Self-contained offset format (e.g. "GMT+5:30", "UTC-3") — works across browsers/sessions
+    // even when no shared abbreviation exists, unlike picker-generated short names.
+    const om=tzStr.match(/^(?:GMT|UTC)([+-]\d{1,2})(?::?(\d{2}))?$/);
+    if(om){
+      const sign=om[1][0]==='-'?-1:1;
+      const hours=Math.abs(parseInt(om[1],10));
+      const mins=parseInt(om[2]||'0',10);
+      offset=sign*(hours*60+mins);
+    }
+  }
+  if(offset===undefined)return{error:'Unknown timezone "'+tzStr+'" — use the 🌐 picker or a standard abbreviation like IST, EST, CET'};
+  const range=parts.slice(0,-1).join(' ');
+  const idx=range.search(/[-\u2013\u2014]/);if(idx<0)return null;
+  const sL=parseTime(range.slice(0,idx).trim());
+  const eL=parseTime(range.slice(idx+1).trim());
+  if(sL===null||eL===null)return null;
+  return{tzStr,offset,startLocal:sL,endLocal:eL,startUTC:sL-offset,endUTC:eL-offset};
+}
+function fmt(m){
+  m=((m%1440)+1440)%1440;
+  const h=Math.floor(m/60),mn=m%60,ap=h>=12?'pm':'am',h12=h%12||12;
+  return mn?h12+':'+String(mn).padStart(2,'0')+ap:h12+ap;
+}
+function loc(utc,off){return((utc+off)+4320)%1440;}
+function midpoint(s,e,dur){return Math.max(s,Math.min(Math.round((s+Math.floor((e-s-dur)/2))/15)*15,e-dur));}
+function inconvenience(ss,se,ws,we){
+  if(ss>=ws&&se<=we)return 0;if(se<=ws)return ws-se;if(ss>=we)return ss-we;return 0;
+}
+function findCompromise(people,dur){
+  const sweepStart=Math.min(...people.map(p=>p.startUTC));
+  const sweepEnd=Math.max(...people.map(p=>p.endUTC));
+  let best=null,bs=Infinity;
+  for(let s=sweepStart;s<=sweepEnd;s+=15){
+    const sc=people.map(p=>inconvenience(s,s+dur,p.startUTC,p.endUTC));
+    const tot=sc.reduce((a,b)=>a+b,0),mx=Math.max(...sc);
+    const comfortable=sc.filter(v=>v===0).length;
+    const score=-comfortable*1000000+tot*1000+mx;
+    if(score<bs){bs=score;best={slotStart:s,slotEnd:s+dur,scores:sc,total:tot,maxInc:mx,comfortable};}
+  }
+  return best;
+}
+function stddev(arr){
+  const m=arr.reduce((a,b)=>a+b,0)/arr.length;
+  return Math.sqrt(arr.map(x=>(x-m)**2).reduce((a,b)=>a+b,0)/arr.length);
+}
+function copyText(btn,text){
+  const done=()=>{const o=btn.textContent;btn.textContent='Copied!';setTimeout(()=>{btn.textContent=o;},2000);};
+  if(navigator.clipboard)navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+  else fallbackCopy(text,done);
+}
+function fallbackCopy(text,cb){
+  const ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);cb();
+}
+function getParams(){
+  const p=new URLSearchParams(window.location.search);
+  return{session:p.get('s'),idx:p.get('i'),name:p.get('n'),org:p.get('org')};
+}
+function setParam(k,v){
+  const u=new URL(window.location.href);
+  v?u.searchParams.set(k,v):u.searchParams.delete(k);
+  window.history.replaceState({},''  ,u);
+}
+function makeInviteLink(sessionId){
+  const u=new URL(window.location.href.split('?')[0]);
+  u.searchParams.set('s',sessionId);
+  return u.toString();
+}
+
+// ── Result builder ─────────────────────────────────
+function buildResult(people,dur){
+  const oS=Math.max(...people.map(p=>((p.startUTC%1440)+1440)%1440));
+  const oE=Math.min(...people.map(p=>((p.endUTC%1440)+1440)%1440));
+  const hasOverlap=oE>oS&&(oE-oS)>=dur;
+  const comp=hasOverlap?{slotStart:oS,slotEnd:oE,scores:people.map(()=>0),total:0,maxInc:0,comfortable:people.length}:findCompromise(people,dur);
+  const sugStart=hasOverlap?midpoint(oS,oE,dur):comp.slotStart;
+  const sugEnd=sugStart+dur;
+  let html='<div class="res-card">';
+  if(hasOverlap){
+    html+='<span class="badge b-ok"><span class="icon icon-check"></span> everyone\'s free</span>';
+    html+='<div class="big-time">'+fmt(oS)+' – '+fmt(oE)+'</div>';
+    html+='<div class="sub-time">'+(oE-oS)+' min overlap window · UTC</div>';
+  }else{
+    html+='<span class="badge b-comp">~ no overlap — best compromise shown</span>';
+    const cn=people.filter((_,i)=>comp.scores[i]===0).map(p=>p.name);
+    html+='<div class="no-overlap-notice"><strong>No overlapping free time found.</strong> '+(cn.length>0?'This slot works within '+cn.join(' & ')+'\'s window — others stretch slightly.':'Everyone needs to stretch slightly for this slot.')+' Confirm with your group before booking.</div>';
+    html+='<div class="big-time">'+fmt(comp.slotStart)+' – '+fmt(comp.slotEnd)+'</div>';
+    html+='<div class="sub-time">'+dur+' min slot · UTC</div>';
+  }
+  html+='<div class="divider"></div><div class="sec-title">suggested meeting time</div>';
+  html+='<div class="suggest-box"><div class="suggest-eyebrow">'+(hasOverlap?'midpoint of overlap':'least inconvenient slot')+'</div>';
+  html+='<div class="suggest-time">'+fmt(sugStart)+' – '+fmt(sugEnd)+' <span style="font-size:16px;font-weight:400;color:#854F0B">UTC</span></div>';
+  html+='<div class="suggest-utc">'+dur+' min · centred in available window</div>';
+  html+='<div class="suggest-list">';
+  people.forEach((p,i)=>{
+    const color=PALETTE[(p.idx!==undefined?p.idx:i)%PALETTE.length];
+    html+='<div class="suggest-row"><div class="dot" style="background:'+color+';flex-shrink:0"></div><span class="suggest-name">'+p.name+'</span><span class="suggest-tz">'+p.tzStr+'</span><span class="suggest-local">'+fmt(loc(sugStart,p.offset))+' – '+fmt(loc(sugEnd,p.offset))+'</span></div>';
+  });
+  html+='</div></div>';
+  if(!hasOverlap&&comp.total>0){
+    html+='<div class="divider"></div><div class="sec-title">how far outside each person\'s window</div><div class="pp-list">';
+    people.forEach((p,i)=>{
+      const inc=comp.scores[i],color=PALETTE[(p.idx!==undefined?p.idx:i)%PALETTE.length];
+      html+='<div class="pp"><div class="dot" style="background:'+color+'"></div><span class="pp-label">'+p.name+' <span style="font-weight:400;color:#aaa;font-size:12px">'+p.tzStr+'</span></span><span class="pp-t">'+fmt(loc(sugStart,p.offset))+' – '+fmt(loc(sugEnd,p.offset))+'</span><span class="st '+(inc?'s-warn':'s-ok')+'">'+(inc?'+'+inc+'m stretch':'in range')+'</span></div>';
+    });
+    html+='</div>';
+    const fp=Math.round(Math.max(0,1-(stddev(comp.scores)/(comp.maxInc||1)))*100);
+    html+='<div style="margin-top:1rem"><div class="sec-title">fairness</div><div class="fair-track"><div class="fair-fill" style="width:'+fp+'%"></div></div><div class="fair-meta"><span>uneven</span><span>'+fp+'% evenly shared</span><span>equal</span></div></div>';
+  }
+  const lines=['CommonSlot — suggested meeting time',''];
+  if(!hasOverlap)lines.push('⚠ No overlap found — least inconvenient slot','');
+  lines.push('UTC: '+fmt(sugStart)+' – '+fmt(sugEnd),'');
+  people.forEach(p=>lines.push(p.name+' ('+p.tzStr+'): '+fmt(loc(sugStart,p.offset))+' – '+fmt(loc(sugEnd,p.offset))));
+  html+='<button class="copy-btn" id="copybtn"><span class="icon icon-clipboard"></span> Copy suggested time</button></div>';
+  return{html,summary:lines.join('\n')};
+}
+
+// ── Row helpers ────────────────────────────────────
+function updateCountBadge(){
+  const el=document.getElementById('countBadge');if(el)el.textContent=rows.length+' / '+MAX;
+  const ab=document.getElementById('addBtn');if(ab)ab.style.display=rows.length>=MAX?'none':'flex';
+}
+function addRow(name,val){
+  if(rows.length>=MAX)return;
+  const id='row_'+(rowCounter++);rows.push(id);
+  const i=rows.length-1,color=PALETTE[i%PALETTE.length];
+  const d=document.createElement('div');d.className='p-row';d.id=id;
+  const dot=document.createElement('div');dot.className='dot';dot.style.background=color;dot.style.flexShrink='0';
+  const nameInp=document.createElement('input');nameInp.className='p-name';nameInp.type='text';nameInp.placeholder='Name (optional)';nameInp.value=name||'';
+  const slotWrap=document.createElement('div');slotWrap.className='slot-wrap';
+  const inp=document.createElement('input');inp.type='text';inp.placeholder='Time & Timezone';inp.value=val||'';
+  const globe=document.createElement('button');globe.className='tz-btn';globe.type='button';globe.setAttribute('aria-label','Pick timezone');globe.innerHTML='<span class="icon icon-globe"></span>';
+  globe.addEventListener('click',function(e){e.stopPropagation();openTzDropdown(globe,inp);});
+  slotWrap.appendChild(inp);slotWrap.appendChild(globe);
+  const btn=document.createElement('button');btn.className='rm';btn.setAttribute('aria-label','remove');btn.innerHTML='&times;';
+  btn.addEventListener('click',function(){removeRow(id);});
+  d.appendChild(dot);d.appendChild(nameInp);d.appendChild(slotWrap);d.appendChild(btn);
+  document.getElementById('pts').appendChild(d);
+  updateCountBadge();
+}
+function removeRow(id){
+  if(rows.length<=2)return;
+  rows=rows.filter(r=>r!==id);
+  document.getElementById(id)?.remove();
+  document.querySelectorAll('.p-row').forEach((row,i)=>{const dot=row.querySelector('.dot');if(dot)dot.style.background=PALETTE[i%PALETTE.length];});
+  updateCountBadge();
+}
+
+// ── Session History helpers ─────────────────────────
+const HIST_KEY='commonslot_history';
+function getHistory(){try{return JSON.parse(localStorage.getItem(HIST_KEY)||'[]');}catch{return[];}}
+function saveToHistory(sessionId,participants,dur){
+  const hist=getHistory().filter(h=>h.id!==sessionId);
+  const names=participants.filter(p=>p.name).map(p=>p.name).join(', ')||'Unnamed session';
+  hist.unshift({id:sessionId,label:names,dur,date:new Date().toISOString(),link:window.location.href.split('?')[0]+'?s='+sessionId+'&org=1'});
+  localStorage.setItem(HIST_KEY,JSON.stringify(hist.slice(0,10)));
+}
+function clearHistory(){localStorage.removeItem(HIST_KEY);}
+
+function renderHistoryPanel(){
+  const hist=getHistory();
+  if(!hist.length)return'';
+  const items=hist.map(h=>{
+    const d=new Date(h.date);
+    const ago=formatAgo(d);
+    return`<div class="hist-item" onclick="resumeSession('${h.id}')">
+      <div class="hist-dot"></div>
+      <div class="hist-info">
+        <div class="hist-name">${h.label}</div>
+        <div class="hist-meta">${h.dur} min · ${ago}</div>
+      </div>
+      <span class="hist-arrow">›</span>
+    </div>`;
+  }).join('');
+  return`<div class="hist-section">
+    <div class="hist-header">
+      <span class="hist-title"><span class="icon icon-clipboard"></span> Previous sessions</span>
+      <button class="hist-clear" onclick="clearHistory();renderOrganiser()">Clear</button>
+    </div>
+    <div class="hist-list">${items}</div>
+  </div>`;
+}
+
+function formatAgo(d){
+  const diff=Date.now()-d.getTime();
+  const mins=Math.floor(diff/60000),hrs=Math.floor(mins/60),days=Math.floor(hrs/24);
+  if(mins<2)return'just now';if(mins<60)return mins+'m ago';if(hrs<24)return hrs+'h ago';
+  if(days===1)return'yesterday';if(days<7)return days+'d ago';
+  return d.toLocaleDateString();
+}
+
+// ── How to Use ─────────────────────────────────────
+const HOW_HTML=`
+  <div class="how-card">
+    <button class="how-toggle" onclick="toggleHow(this)">
+      <span class="how-toggle-label"><span class="icon icon-bulb"></span> How to use CommonSlot</span>
+      <span class="how-toggle-arrow">▾</span>
+    </button>
+    <div class="how-body">
+      <div class="how-step"><div class="how-num">1</div><div class="how-text"><strong>Add participants.</strong> Enter each person's name (optional) and their available time window, e.g. <em>2pm-8pm IST</em> or <em>9am-1pm EST</em>. Use the <span class="icon icon-globe"></span> globe button to pick a city/timezone.</div></div>
+      <div class="how-step"><div class="how-num">2</div><div class="how-text"><strong>Set meeting duration</strong> — 30 min, 1 hour, 90 min, or 2 hours.</div></div>
+      <div class="how-step"><div class="how-num">3</div><div class="how-text"><strong>Click "Find our slot".</strong> CommonSlot finds the overlap (or best compromise) and shows everyone's local time instantly.</div></div>
+      <div class="how-step"><div class="how-num">4</div><div class="how-text"><strong>Share the link.</strong> Copy the invite link and send it to your group. They can add their own availability without any login.</div></div>
+      <div class="how-step"><div class="how-num">5</div><div class="how-text"><strong>Results update live.</strong> As each person submits their slot, the suggested time recalculates automatically. Sessions are saved so you can return any time using "Previous sessions".</div></div>
+    </div>
+  </div>`;
+
+function toggleHow(btn){
+  const arrow=btn.querySelector('.how-toggle-arrow');
+  const body=btn.nextElementSibling;
+  const open=body.classList.toggle('open');
+  arrow.classList.toggle('open',open);
+}
+
+// ── Organiser view ─────────────────────────────────
+function renderOrganiser(){
+  document.getElementById('app').innerHTML=`
+    <div class="wrap">
+      <div class="hero">
+        <div class="wordmark">Common<span>Slot</span></div>
+        <div class="tagline">No more timezone gymnastics, Just the time that works for everyone.</div>
+      </div>
+      ${renderHistoryPanel()}
+      <div class="card">
+        <div style="display:flex;align-items:center;margin-bottom:1rem">
+          <div class="pill-label" style="margin-bottom:0">⏰ availability windows</div>
+          <span class="count-badge" id="countBadge">2 / 15</span>
+        </div>
+        <div class="participants" id="pts"></div>
+        <button class="add-row" id="addBtn" onclick="addRow('','')">+ add another person</button>
+        <div class="dur-row">
+          <span class="dur-label">Meeting duration:</span>
+          <select class="dur-select" id="duration">
+            <option value="30">30 minutes</option>
+            <option value="60" selected>1 hour</option>
+            <option value="90">90 minutes</option>
+            <option value="120">2 hours</option>
+          </select>
+        </div>
+        <button class="go" id="findBtn" onclick="orgCreate()">Find our slot</button>
+        <div class="hint">Format: <code>2pm-8pm IST</code> &nbsp;·&nbsp; <code>9am-1pm EST</code> &nbsp;·&nbsp; <code>14:00-18:00 CET</code> &nbsp;·&nbsp; or use <span class="icon icon-globe"></span> to pick a city</div>
+      </div>
+      <div id="sharePanel" style="display:none"></div>
+      <div id="result"></div>
+      ${HOW_HTML}
+    </div>
+  `;
+  rows=[];rowCounter=0;
+  addRow('','');addRow('','');
+  updateCountBadge();
+}
+
+function newMeeting(){
+  setParam('s',null);setParam('org',null);
+  if(realtimeChannel)sb.removeChannel(realtimeChannel);
+  renderOrganiser();
+}
+
+async function orgCreate(){
+  const pRows=document.querySelectorAll('.p-row');
+  const dur=parseInt(document.getElementById('duration').value);
+  const participants=[],people=[],errors=[];
+  pRows.forEach((row,i)=>{
+    const name=row.querySelector('.p-name').value.trim();
+    const v=row.querySelector('.slot-wrap input').value.trim();
+    const label=displayName(name,v,i);
+    participants.push({idx:i,name:name||null,slot:v||null});
+    if(!v)return; // optional — they can add their time later via the share link
+    const p=parseInput(v);
+    if(!p||p.error){errors.push(label+': '+(p&&p.error?p.error:'couldn\'t parse "'+v+'"'));return;}
+    people.push(Object.assign({},p,{idx:i,name:label}));
+  });
+  const el=document.getElementById('result');
+  if(errors.length){el.innerHTML='<div class="res-card"><div class="err-msg">'+errors.map(e=>'<span class="icon icon-warning"></span> '+e).join('<br>')+'</div></div>';return;}
+  if(people.length===0){el.innerHTML='<div class="res-card"><div class="err-msg">Add at least your own availability to get started.</div></div>';return;}
+  const btn=document.getElementById('findBtn');
+  btn.disabled=true;btn.textContent='Creating session…';
+  const sessionId=randId(8);
+  const{error:sessErr}=await sb.from('sessions').insert({id:sessionId,duration:dur,participants});
+  if(sessErr){
+    btn.disabled=false;btn.textContent='Find our slot';
+    el.innerHTML='<div class="res-card"><div class="err-msg"><span class="icon icon-warning"></span> Could not create session: '+sessErr.message+'</div></div>';
+    return;
+  }
+  // Save organiser's slots immediately
+  const prefilled=participants.filter(p=>p.slot);
+  if(prefilled.length){
+    await sb.from('responses').upsert(prefilled.map(p=>({session_id:sessionId,participant_idx:p.idx,name:p.name,slot:p.slot})),{onConflict:'session_id,participant_idx'});
+  }
+  btn.disabled=false;btn.textContent='Find our slot';
+  const orgLink=window.location.href.split('?')[0]+'?s='+sessionId+'&org=1';
+  setParam('s',sessionId);setParam('org','1');
+  saveToHistory(sessionId,participants,dur);
+  await orgShowSession(sessionId,participants,dur,people);
+}
+
+async function orgShowSession(sessionId,participants,dur,initialPeople){
+  const{data:resps}=await sb.from('responses').select('*').eq('session_id',sessionId);
+  const rMap={};(resps||[]).forEach(r=>{rMap[r.participant_idx]=r;});
+  const sessionLink=makeInviteLink(sessionId);
+
+  function buildPanel(){
+    const responded=Object.keys(rMap).length;
+    const panel=document.getElementById('sharePanel');
+    panel.style.display='block';
+    panel.innerHTML=`
+      <button class="new-meeting-btn" onclick="newMeeting()">＋ New meeting schedule</button>
+      <div class="share-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem">
+          <div class="share-title"><span class="icon icon-link"></span> Share with your group</div>
+          <span style="font-size:12px;color:#1D9E75"><span class="live-dot"></span>live</span>
+        </div>
+        <div class="share-sub">Everyone opens this one link, enters their time, and you see it appear here instantly.</div>
+        <div class="share-link-row">
+          <div class="share-link-box">${sessionLink}</div>
+          <button class="share-copy" id="copySessionLink">Copy link</button>
+        </div>
+        <div class="share-actions" id="shareActionsRow" style="display:none">
+          <button class="share-native" id="shareSessionLink"><span class="icon icon-send"></span> Send to someone</button>
+        </div>
+        <div class="sec-title" style="margin-top:1rem;margin-bottom:.5rem">${responded} responded</div>
+        <div class="status-list">
+          ${responded===0?'<div style="font-size:13px;color:#aaa;padding:8px 0">No one has joined yet. Share the link above!</div>':
+            Object.values(rMap).map((r,i)=>{
+              const label=displayName(r.name,r.slot,r.participant_idx);
+              return'<div class="status-row" id="sr_'+r.participant_idx+'">'
+                +'<div class="dot" style="background:'+PALETTE[r.participant_idx%PALETTE.length]+'"></div>'
+                +'<span class="status-name">'+label+'</span>'
+                +'<span class="status-slot">'+r.slot+'</span><span class="s-tag s-done"><span class="icon icon-check"></span></span>'
+                +'</div>';
+            }).join('')}
+        </div>
+      </div>
+    `;
+    document.getElementById('copySessionLink').addEventListener('click',function(){copyText(this,sessionLink);});
+    if(navigator.share){
+      const row=document.getElementById('shareActionsRow');
+      row.style.display='flex';
+      document.getElementById('shareSessionLink').addEventListener('click',function(){
+        navigator.share({title:'CommonSlot — find when everyone can meet',text:'Find a time that works for everyone:',url:sessionLink}).catch(()=>{});
+      });
+    }
+  }
+
+  function pendingNotice(){
+    return '<div class="res-card"><div class="badge b-comp"><span class="icon icon-send"></span> waiting on everyone else</div>'
+      +'<div class="sub-time" style="margin-top:.65rem;line-height:1.6">Send the link below to the rest of your group — as soon as a second person adds their time, your common slot will appear here automatically.</div></div>';
+  }
+
+  function recalc(){
+    const people=Object.values(rMap).map(r=>{
+      const p=parseInput(r.slot);if(!p||p.error)return null;
+      return Object.assign({},p,{idx:r.participant_idx,name:displayName(r.name,r.slot,r.participant_idx)});
+    }).filter(Boolean);
+    if(people.length>=2){
+      const{html,summary}=buildResult(people,dur);
+      document.getElementById('result').innerHTML=html;
+      document.getElementById('copybtn').addEventListener('click',function(){copyText(this,summary);});
+    }else{
+      document.getElementById('result').innerHTML=pendingNotice();
+    }
+  }
+
+  buildPanel();
+  // Show result with whatever slots we already have
+  if(initialPeople&&initialPeople.length>=2){
+    const{html,summary}=buildResult(initialPeople,dur);
+    document.getElementById('result').innerHTML=html;
+    document.getElementById('copybtn').addEventListener('click',function(){copyText(this,summary);});
+  }else{
+    document.getElementById('result').innerHTML=pendingNotice();
+  }
+  recalc();
+
+  // Real-time subscription
+  if(realtimeChannel)sb.removeChannel(realtimeChannel);
+  realtimeChannel=sb.channel('org_'+sessionId)
+    .on('postgres_changes',{event:'*',schema:'public',table:'responses',filter:'session_id=eq.'+sessionId},payload=>{
+      rMap[payload.new.participant_idx]=payload.new;
+      buildPanel();recalc();
+    }).subscribe();
+}
+
+// ── Participant view ────────────────────────────────
+async function renderParticipant(sessionId,participantIdx,urlName){
+  const app=document.getElementById('app');
+  app.innerHTML='<div class="wrap" style="text-align:center;padding:4rem 1rem;color:#aaa">Loading…</div>';
+  const{data:session,error}=await sb.from('sessions').select('*').eq('id',sessionId).single();
+  if(error||!session){
+    app.innerHTML='<div class="wrap"><div class="hero"><div class="wordmark">Common<span>Slot</span></div></div><div class="res-card"><div class="err-msg"><span class="icon icon-warning"></span> Session not found or expired.</div></div></div>';
+    return;
+  }
+  const participants=session.participants||[];
+  const dur=session.duration;
+  const greeting=urlName||participants[participantIdx]?.name||null;
+  const{data:existing}=await sb.from('responses').select('*').eq('session_id',sessionId).eq('participant_idx',participantIdx).maybeSingle();
+  const{data:allResps}=await sb.from('responses').select('*').eq('session_id',sessionId);
+  const rMap={};(allResps||[]).forEach(r=>{rMap[r.participant_idx]=r;});
+
+  function render(){
+    app.innerHTML=`
+      <div class="wrap">
+        <div class="hero"><div class="wordmark">Common<span>Slot</span></div><div class="tagline">No more timezone gymnastics, Just the time that works for everyone.</div></div>
+        <div class="invite-banner">
+          <div class="invite-from">you've been invited to find a meeting time</div>
+          <div class="invite-greeting">Hey${greeting?', '+greeting:''}! <span class="icon icon-wave"></span></div>
+          <div class="invite-msg">Enter your availability — it syncs to everyone instantly.</div>
+        </div>
+        <div class="card">
+          <label class="field-label">Your time window</label>
+          <input class="field-input" id="mySlot" type="text" value="${existing?existing.slot:''}" placeholder="e.g. 2pm-8pm IST">
+          ${!greeting?'<label class="field-label">Your name <span style="text-transform:none;font-weight:400;color:#bbb">(optional)</span></label><input class="field-input" id="myName" type="text" placeholder="e.g. Priya">':'<input type="hidden" id="myName" value="'+(greeting||'')+'">'}
+          <button class="go" id="submitBtn" onclick="participantSubmit('${sessionId}',${participantIdx},${dur})">${existing?'Update availability':'Submit availability'}</button>
+          <div class="hint" style="margin-top:.65rem">Format: <code>2pm-8pm IST</code> or <code>14:00-18:00 CET</code> &nbsp;·&nbsp; or use <span class="icon icon-globe"></span> below</div>
+        </div>
+        <div id="submitMsg"></div>
+        ${participants.length>1?`
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+            <div class="sec-title" style="margin-bottom:0">others in this session</div>
+            <span style="font-size:12px;color:#1D9E75"><span class="live-dot"></span>live</span>
+          </div>
+          <div class="others-list" id="othersList">
+            ${participants.map((p,i)=>{
+              const isMe=i===participantIdx,r=rMap[i];
+              const label=displayName(p.name,null,i);
+              const cls=isMe?'ot-you':(r?'ot-done':'ot-wait');
+              const txt=isMe?'you':(r?'<span class="icon icon-check"></span>':'waiting');
+              return'<div class="others-row" id="or_'+i+'"><div class="dot" style="background:'+PALETTE[i%PALETTE.length]+'"></div><span class="others-name">'+label+(isMe?' (you)':'')+'</span><span class="others-tag '+cls+'">'+txt+'</span></div>';
+            }).join('')}
+          </div>
+        </div>`:''}
+      </div>
+    `;
+    // Wire up globe button for participant slot input
+    const slotInp=document.getElementById('mySlot');
+    const globeBtn=document.createElement('button');
+    globeBtn.className='tz-btn';globeBtn.type='button';globeBtn.innerHTML='<span class="icon icon-globe"></span>';
+    globeBtn.style.cssText='margin-top:-.5rem;margin-bottom:1rem';
+    globeBtn.addEventListener('click',function(e){e.stopPropagation();openTzDropdown(globeBtn,slotInp);});
+    slotInp.parentNode.insertBefore(globeBtn,slotInp.nextSibling);
+  }
+
+  render();
+
+  sb.channel('part_'+sessionId+'_'+participantIdx)
+    .on('postgres_changes',{event:'*',schema:'public',table:'responses',filter:'session_id=eq.'+sessionId},payload=>{
+      const r=payload.new;
+      rMap[r.participant_idx]=r;
+      if(r.participant_idx!==participantIdx){
+        const row=document.getElementById('or_'+r.participant_idx);
+        if(row){const t=row.querySelector('.others-tag');if(t){t.className='others-tag ot-done';t.innerHTML='<span class="icon icon-check"></span>';}}
+      }
+    }).subscribe();
+}
+
+async function participantSubmit(sessionId,participantIdx,dur){
+  const slot=document.getElementById('mySlot').value.trim();
+  const nameEl=document.getElementById('myName');
+  const rawName=nameEl?nameEl.value.trim():'';
+  if(!slot){alert('Please enter your availability.');return;}
+  const p=parseInput(slot);
+  if(!p){alert('Couldn\'t parse that. Try: 2pm-8pm IST');return;}
+  if(p.error){alert(p.error);return;}
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true;btn.textContent='Saving…';
+  const{error}=await sb.from('responses').upsert({session_id:sessionId,participant_idx:participantIdx,name:rawName||null,slot},{onConflict:'session_id,participant_idx'});
+  btn.disabled=false;btn.textContent='Update availability';
+  if(error){document.getElementById('submitMsg').innerHTML='<div class="res-card"><div class="err-msg"><span class="icon icon-warning"></span> '+error.message+'</div></div>';return;}
+  const myRow=document.getElementById('or_'+participantIdx);
+  if(myRow){const t=myRow.querySelector('.others-tag');if(t){t.className='others-tag ot-done';t.innerHTML='<span class="icon icon-check"></span>';}}
+  document.getElementById('submitMsg').innerHTML=`
+    <div class="success-box">
+      <div class="success-title"><span class="icon icon-check"></span> Submitted!</div>
+      <div class="success-msg">The organiser can see your availability now. You can update it above anytime.</div>
+      <div class="success-slot">${slot}</div>
+    </div>
+  `;
+}
+
+// ── Returning organiser ─────────────────────────────
+async function resumeSession(sessionId){
+  const{data:session}=await sb.from('sessions').select('*').eq('id',sessionId).single();
+  if(!session){renderOrganiser();return;}
+  renderOrganiser();
+  saveToHistory(sessionId,session.participants,session.duration);
+  setParam('s',sessionId);setParam('org','1');
+  await orgShowSession(sessionId,session.participants,session.duration,null);
+}
+
+// ── Join view (open link as a new participant) ──────
+async function renderJoin(sessionId){
+  const app=document.getElementById('app');
+  app.innerHTML='<div class="wrap" style="text-align:center;padding:4rem 1rem;color:#aaa">Loading…</div>';
+  const{data:session,error}=await sb.from('sessions').select('*').eq('id',sessionId).single();
+  if(error||!session){
+    app.innerHTML='<div class="wrap"><div class="hero"><div class="wordmark">Common<span>Slot</span></div></div><div class="res-card"><div class="err-msg"><span class="icon icon-warning"></span> Session not found or expired.</div></div></div>';
+    return;
+  }
+  const dur=session.duration;
+  // Get all existing responses to show who's already in
+  const{data:allResps}=await sb.from('responses').select('*').eq('session_id',sessionId);
+  const existing=allResps||[];
+  // The new participant's idx = next available
+  let myIdx=existing.length>0?Math.max(...existing.map(r=>r.participant_idx))+1:0;
+
+  function render(resps){
+    const whoJoined=resps.map((r,i)=>displayName(r.name,r.slot,r.participant_idx));
+    app.innerHTML=`
+      <div class="wrap">
+        <div class="hero">
+          <div class="wordmark">Common<span>Slot</span></div>
+          <div class="tagline">No more timezone gymnastics, Just the time that works for everyone.</div>
+        </div>
+        <div class="join-banner">
+          <div class="join-icon"><span class="icon icon-lg icon-calendar"></span></div>
+          <div class="join-title">You've been invited!</div>
+          <div class="join-sub">Enter your availability to find a time that works for the group.</div>
+          ${whoJoined.length>0?`<div class="join-who">${whoJoined.map(n=>'<span class="join-who-pill">'+n+' <span class="icon icon-check"></span></span>').join('')}</div>`:''}
+          <div class="join-dur">Meeting duration: <strong>${dur} min</strong></div>
+        </div>
+        <div class="card">
+          <label class="field-label">Your name <span style="text-transform:none;font-weight:400;color:#bbb">(optional)</span></label>
+          <input class="field-input" id="joinName" type="text" placeholder="e.g. Priya">
+          <label class="field-label">Your time window</label>
+          <input class="field-input" id="joinSlot" type="text" placeholder="e.g. 2pm-8pm IST">
+          <button class="go" id="joinBtn">Add my availability</button>
+          <div class="hint" style="margin-top:.65rem">Format: <code>2pm-8pm IST</code> &nbsp;·&nbsp; <code>14:00-18:00 CET</code> &nbsp;·&nbsp; or use <span class="icon icon-globe"></span> to pick a city</div>
+        </div>
+        <div id="joinMsg"></div>
+        <div style="text-align:center;margin-top:.5rem">
+          <a href="?s=${sessionId}&org=1" style="font-size:12px;color:#aaa;text-decoration:none;border-bottom:1px dashed #d6cfc3">Are you the organiser? View your session →</a>
+        </div>
+      </div>
+    `;
+    // Wire up globe button
+    const slotInp=document.getElementById('joinSlot');
+    const globeBtn=document.createElement('button');
+    globeBtn.className='tz-btn';globeBtn.type='button';globeBtn.innerHTML='<span class="icon icon-globe"></span>';
+    globeBtn.style.cssText='margin-top:-.5rem;margin-bottom:1rem';
+    globeBtn.addEventListener('click',function(e){e.stopPropagation();openTzDropdown(globeBtn,slotInp);});
+    slotInp.parentNode.insertBefore(globeBtn,slotInp.nextSibling);
+    document.getElementById('joinBtn').addEventListener('click',()=>joinSubmit(sessionId,myIdx,dur));
+  }
+
+  render(existing);
+
+  // Real-time: update the "who's in" pills as others join
+  sb.channel('join_'+sessionId)
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'responses',filter:'session_id=eq.'+sessionId},payload=>{
+      existing.push(payload.new);
+      // Only re-render the banner pills if the join form hasn't been submitted yet
+      const banner=document.querySelector('.join-who');
+      if(banner){
+        const whoJoined=existing.map(r=>displayName(r.name,r.slot,r.participant_idx));
+        banner.innerHTML=whoJoined.map(n=>'<span class="join-who-pill">'+n+' <span class="icon icon-check"></span></span>').join('');
+      }
+    }).subscribe();
+}
+
+async function joinSubmit(sessionId,myIdx,dur){
+  const slot=document.getElementById('joinSlot').value.trim();
+  const name=document.getElementById('joinName').value.trim();
+  if(!slot){alert('Please enter your availability.');return;}
+  const p=parseInput(slot);
+  if(!p){alert('Couldn\'t parse that. Try: 2pm-8pm IST');return;}
+  if(p.error){alert(p.error);return;}
+  const btn=document.getElementById('joinBtn');
+  btn.disabled=true;btn.textContent='Adding you…';
+  const{error}=await sb.from('responses').insert({session_id:sessionId,participant_idx:myIdx,name:name||null,slot});
+  if(error){
+    btn.disabled=false;btn.textContent='Add my availability';
+    document.getElementById('joinMsg').innerHTML='<div class="res-card"><div class="err-msg"><span class="icon icon-warning"></span> '+error.message+'</div></div>';
+    return;
+  }
+  document.getElementById('joinMsg').innerHTML=`
+    <div class="success-box">
+      <div class="success-title"><span class="icon icon-check"></span> You're in!</div>
+      <div class="success-msg">The organiser can see your availability now. The group result will update automatically.</div>
+      <div class="success-slot">${slot}</div>
+    </div>
+  `;
+  btn.disabled=true;btn.innerHTML='Availability added <span class="icon icon-check"></span>';
+  btn.style.background='#1D9E75';
+}
+
+// ── Boot ────────────────────────────────────────────
+(async function(){
+  const{session,idx,name,org}=getParams();
+  if(session&&idx!==null){
+    // Legacy per-person link (i= param) — still works
+    await renderParticipant(session,parseInt(idx),name?decodeURIComponent(name):null);
+  }else if(session&&org==='1'){
+    // Organiser returning to their session
+    await resumeSession(session);
+  }else if(session){
+    // Anyone else opening the shared link → join view
+    await renderJoin(session);
+  }else{
+    renderOrganiser();
+  }
+})();
+</script>
+</body>
+</html>
